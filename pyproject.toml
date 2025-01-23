@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "sharepoint_connector"
+version = "0.1.0"
+description = ""
+authors = ["Bruno Soufo"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+fastapi = "^0.115.7"
+pyjwt = "^2.10.1"
+cryptography = "^44.0.0"
+shareplum = "^0.5.1"
+msal = "^1.31.1"
+requests = "^2.32.3"
+uvicorn = "^0.34.0"
+python-multipart = "^0.0.20"
+python-dotenv = "^1.0.1"
+starlette = "^0.45.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

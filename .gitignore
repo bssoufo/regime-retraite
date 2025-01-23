@@ -1,0 +1,50 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.dll
+
+# C extensions
+*.egg-info/
+*.egg
+*.whl
+
+# Distribution / packaging
+.env
+build/
+dist/
+MANIFEST
+
+# Unit test / coverage reports
+.coverage
+*.xml
+
+# Translations
+*.mo
+
+# IDE / Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+*.tmproj
+*.komodoproject
+*.pydevproject
+.tags
+
+# OS or env specific files
+.DS_Store
+ehthumbs.db
+Thumbs.db
+*.log
+
+# Poetry related
+poetry.lock
+.venv
+
+# Specific to this project
+# If you have any other specific file you want to ignore, put them here.
