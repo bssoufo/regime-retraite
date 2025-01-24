@@ -1,13 +1,18 @@
+# File: app/utils.py
+
 import os
 import uuid
 from datetime import datetime
-from typing import List
+from typing import Optional
 from fastapi import HTTPException
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import List, Optional
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from logging.handlers import TimedRotatingFileHandler
+import logging
+import shutil
 
 
 # Initialiser l'environnement Jinja2
@@ -18,31 +23,92 @@ env = Environment(
 )
 
 
+# Configuration du Logging
+LOG_DIRECTORY = os.path.join(os.path.dirname(__file__), '..', 'logs')
+ARCHIVE_DIRECTORY = os.path.join(LOG_DIRECTORY, 'archive')
+
+# Créer les dossiers de log et d'archive s'ils n'existent pas
+os.makedirs(LOG_DIRECTORY, exist_ok=True)
+os.makedirs(ARCHIVE_DIRECTORY, exist_ok=True)
+
+class ArchivingTimedRotatingFileHandler(TimedRotatingFileHandler):
+    """
+    Gestionnaire de fichiers de log qui archive les fichiers de log après rotation.
+    """
+    def __init__(self, filename, when='midnight', interval=1, backupCount=0, encoding=None, delay=False, utc=False, atTime=None):
+        super().__init__(filename, when, interval, backupCount, encoding, delay, utc, atTime)
+
+    def doRollover(self):
+        super().doRollover()
+        # Déplacer le fichier de log rotaté dans le dossier d'archive
+        if self.backupCount > 0:
+            for i in range(self.backupCount, 0, -1):
+                sfn = f"{self.baseFilename}.{self.extMatch.match(str(i))}"
+                dfn = os.path.join(ARCHIVE_DIRECTORY, os.path.basename(sfn))
+                if os.path.exists(sfn):
+                    shutil.move(sfn, dfn)
+
+
+
+# Configuration du Logger
+logger = logging.getLogger("app_logger")
+logger.setLevel(logging.INFO)
+
+# Création du gestionnaire de fichiers de log avec rotation quotidienne
+log_file = os.path.join(LOG_DIRECTORY, 'app.log')
+handler = ArchivingTimedRotatingFileHandler(
+    log_file,
+    when='midnight',
+    interval=1,
+    backupCount=30,  # Nombre de fichiers de log à conserver dans l'archive
+    encoding='utf-8'
+)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 def create_upload_directory(base_dir: str, email: str) -> str:
-    """Creates a unique upload directory based on email and a UUID."""
+    """Creates a unique upload directory based on email and a UUID without replacing '@'."""
     unique_id = str(uuid.uuid4())
-    dir_name = f"{email.replace('@', '_')}-{unique_id}"
+    dir_name = f"{email}-{unique_id}"  # Ne plus remplacer '@' par '_'
     upload_dir = os.path.join(base_dir, dir_name)
     os.makedirs(upload_dir, exist_ok=True)
+    logger.info(f"Created upload directory: {upload_dir}")
     return upload_dir
 
 def create_identification_file(upload_dir: str, name: str, date_of_birth: str, email: str) -> None:
     """Creates the identification_client.txt file with client information."""
     file_path = os.path.join(upload_dir, "identification_client.txt")
-    with open(file_path, "w") as f:
-        f.write(f"Nom: {name}\n")
-        f.write(f"Date de naissance: {date_of_birth}\n")
-        f.write(f"Email: {email}\n")
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(f"Nom: {name}\n")
+            f.write(f"Date de naissance: {date_of_birth}\n")
+            f.write(f"Email: {email}\n")
+        logger.info(f"Created identification file at: {file_path}")
+    except Exception as e:
+        logger.error(f"Failed to create identification file at {file_path}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create identification file.")
 
 def rename_file(upload_dir: str, original_filename: str, description: str) -> str:
-    """Renames the file with description and current date."""
-    current_date = datetime.now().strftime("%Y-%m-%d")
-    _, file_extension = os.path.splitext(original_filename)
-    new_filename = f"{description}_{current_date}{file_extension}"
+    """
+    Renomme le fichier en utilisant le nom original et un horodatage de réception.
+
+    Format: nom_original_timestamp_de_reception.ext
+
+    Args:
+        upload_dir (str): Chemin vers le répertoire d'upload.
+        original_filename (str): Nom original du fichier.
+        description (str): Description du fichier (non utilisée dans le renommage).
+
+    Returns:
+        str: Chemin complet du fichier renommé.
+    """
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    name, file_extension = os.path.splitext(original_filename)
+    new_filename = f"{name}_{timestamp}{file_extension}"
     new_file_path = os.path.join(upload_dir, new_filename)
+    logger.info(f"Renamed file '{original_filename}' to '{new_filename}'")
     return new_file_path
-
-
 
 def get_user_name(upload_dir: str) -> Optional[str]:
     """
@@ -56,16 +122,18 @@ def get_user_name(upload_dir: str) -> Optional[str]:
     """
     identification_file = os.path.join(upload_dir, "identification_client.txt")
     if not os.path.isfile(identification_file):
-        print(f"Le fichier {identification_file} n'existe pas.")
+        logger.warning(f"Le fichier {identification_file} n'existe pas.")
         return None
     
     try:
         with open(identification_file, "r", encoding="utf-8") as f:
             for line in f:
                 if line.startswith("Nom:"):
-                    return line.split("Nom:")[1].strip()
+                    name = line.split("Nom:")[1].strip()
+                    logger.info(f"Extracted user name: {name}")
+                    return name
     except Exception as e:
-        print(f"Erreur lors de la lecture du fichier {identification_file}: {e}")
+        logger.error(f"Erreur lors de la lecture du fichier {identification_file}: {e}")
     
     return None
 
@@ -93,7 +161,7 @@ def send_email(subject: str, template_name: str, context: dict, recipients: List
         template = env.get_template(template_name)
         html_content = template.render(context)
     except Exception as e:
-        print(f"Erreur lors du rendu du template {template_name}: {e}")
+        logger.error(f"Erreur lors du rendu du template {template_name}: {e}")
         raise
 
     msg = MIMEMultipart()
@@ -108,7 +176,7 @@ def send_email(subject: str, template_name: str, context: dict, recipients: List
             server.starttls()
             server.login(smtp_user, smtp_password)
             server.sendmail(sender_email, recipients, msg.as_string())
-        print(f"Email envoyé à {recipients}")
+        logger.info(f"Email envoyé à {recipients} avec le sujet '{subject}'")
     except Exception as e:
-        print(f"Échec de l'envoi de l'e-mail à {recipients}: {e}")
+        logger.error(f"Échec de l'envoi de l'e-mail à {recipients}: {e}")
 

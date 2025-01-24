@@ -1,1 +1,1 @@
-poetry run uvicorn sharepoint_connector.main:app --reload
+poetry run uvicorn app.main:app --reload

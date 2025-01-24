@@ -1,0 +1,5 @@
+Ajouter la gestion des logs pour l'audit
+Ajouter un token generer pour la securité, ce sera juste un simple header
+Ajouter un process pour relancer les upload qui ont échoué au cas ou un proble arrive
+
+Tester le rollout
