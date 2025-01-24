@@ -1,15 +1,29 @@
 # File: app/main.py
 
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTasks, Request, Security
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional, Dict
 from datetime import date
-from fastapi.middleware.cors import CORSMiddleware
 import os
-from dotenv import load_dotenv
-from app.utils import create_upload_directory, create_identification_file, rename_file, logger,envoyer_notification_erreur_systeme
-from sharepoint_connector.sharepoint_uploader import upload_files_to_sharepoint
+import uuid
 import traceback
-from fastapi.responses import JSONResponse
+from fastapi import Depends
+from fastapi import HTTPException, Security, status
+
+from dotenv import load_dotenv
+
+from app.utils import (
+    create_upload_directory,
+    create_identification_file,
+    rename_file,
+    logger,
+    envoyer_notification_erreur_systeme,
+    get_api_key,
+    API_KEY_NAME
+)
+
+from sharepoint_connector.sharepoint_uploader import upload_files_to_sharepoint
 
 load_dotenv()
 
@@ -20,7 +34,7 @@ origins = [
     "http://localhost",
     "http://localhost:8080",
     "http://127.0.0.1:8000",
-    "*",  # ATTENTION : Soyez prudent avec '*' en production.
+    "*",  # WARNING: Be cautious with '*' in production.
 ]
 
 app.add_middleware(
@@ -32,7 +46,7 @@ app.add_middleware(
 )
 
 UPLOAD_DIRECTORY = os.getenv("UPLOAD_DIRECTORY")
-ALLOWED_EXTENSIONS_STR = os.getenv("ALLOWED_EXTENSIONS", ".pdf,.docx,.xlsx,.jpg,.jpeg,.png,.gif")
+ALLOWED_EXTENSIONS_STR = os.getenv("ALLOWED_EXTENSIONS_STR", ".pdf,.docx,.xlsx,.jpg,.jpeg,.png,.gif")
 ALLOWED_EXTENSIONS = [ext.strip().lower() for ext in ALLOWED_EXTENSIONS_STR.split(',')]
 
 if not UPLOAD_DIRECTORY:
@@ -45,8 +59,11 @@ async def create_upload_files(
     name: str = Form(...),
     date_of_birth: str = Form(...),
     email: str = Form(...),
-    background_tasks: BackgroundTasks = BackgroundTasks()  # Ajout de BackgroundTasks
+    background_tasks: BackgroundTasks = BackgroundTasks()
 ):
+    """
+    Endpoint pour uploader des fichiers. Protégé par un token de sécurité.
+    """
     if not UPLOAD_DIRECTORY:
         logger.error("UPLOAD_DIRECTORY is not configured.")
         raise Exception("UPLOAD_DIRECTORY is not configured.")
@@ -57,9 +74,9 @@ async def create_upload_files(
 
     uploaded_files_info = []
     files_data = []
-    form_data = await request.form()  # Récupérer les données du formulaire
+    form_data = await request.form()  # Get form data
 
-    # Debug : Afficher toutes les clés du formulaire et leurs types
+    # Debug: Print all form keys and their types
     logger.debug("Form Data Keys and Types:")
     for key in form_data.keys():
         value = form_data.get(key)
@@ -153,10 +170,7 @@ async def create_upload_files(
     logger.info(f"Upload response: {response}")
     return response
 
-@app.get("/cause-error")
-async def cause_error():
-    raise ValueError("Ceci est une erreur de test.")
-
+# Gestionnaire d'exceptions global
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """
@@ -183,3 +197,47 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Une erreur interne s'est produite. L'équipe de support a été notifiée."},
         background=background_tasks
     )
+@app.middleware("http")
+async def security_middleware(request: Request, call_next):
+    """
+    Middleware pour valider le token de sécurité pour chaque requête.
+    """
+    try:
+        # Extraire le token depuis les en-têtes
+        api_key = request.headers.get(API_KEY_NAME)
+        if not api_key:
+            logger.warning("Token de sécurité manquant dans les en-têtes de la requête.")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token de sécurité manquant.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        expected_api_key = os.getenv("API_SECURITY_TOKEN")
+        if api_key != expected_api_key:
+            logger.warning("Token de sécurité invalide fourni.")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Token de sécurité invalide.",
+            )
+        
+        # Si le token est valide, continuez le traitement de la requête
+        response = await call_next(request)
+        return response
+    except HTTPException as http_exc:
+        # Gérer les exceptions HTTP
+        return JSONResponse(
+            status_code=http_exc.status_code,
+            content={"detail": http_exc.detail},
+        )
+    except Exception as e:
+        # Gérer les autres exceptions
+        error_trace = traceback.format_exc()
+        logger.error(f"Exception dans le middleware de sécurité: {e}\nTraceback: {error_trace}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Une erreur interne s'est produite. L'équipe de support a été notifiée."},
+        )
+@app.get("/cause-error")
+async def cause_error():
+    raise ValueError("Ceci est une erreur de test.")

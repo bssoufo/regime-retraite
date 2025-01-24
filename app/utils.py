@@ -13,7 +13,15 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from logging.handlers import TimedRotatingFileHandler
 import logging
 import shutil
+from fastapi import HTTPException, Security, status
+from fastapi.security import APIKeyHeader
 
+
+# Définir le nom de l'en-tête où le token sera attendu
+API_KEY_NAME = "X-API-Token"
+
+# Créer une instance de sécurité pour l'en-tête
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 # Initialiser l'environnement Jinja2
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), '..', 'email_templates')
@@ -216,3 +224,36 @@ def envoyer_notification_erreur_systeme(user_email: str, error: Exception, trace
             logger.error(f"Erreur lors de l'envoi de la notification d'erreur système à {support_emails}: {e}")
     else:
         logger.warning("SUPPORT_EMAILS n'est pas défini correctement dans les variables d'environnement.")
+
+
+
+def get_api_key(api_key: Optional[str] = Security(api_key_header)) -> str:
+    """
+    Fonction de dépendance pour valider le token de sécurité présent dans les en-têtes de la requête.
+    
+    Args:
+        api_key (Optional[str]): Le token récupéré depuis l'en-tête de la requête.
+
+    Returns:
+        str: Le token valide si la validation réussit.
+
+    Raises:
+        HTTPException: Si le token est manquant ou invalide.
+    """
+    if not api_key:
+        logger.warning("Token de sécurité manquant dans les en-têtes de la requête.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token de sécurité manquant.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    expected_api_key = os.getenv("API_SECURITY_TOKEN")
+    if api_key != expected_api_key:
+        logger.warning("Token de sécurité invalide fourni.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Token de sécurité invalide.",
+        )
+    
+    return api_key
