@@ -1,5 +1,6 @@
-Ajouter la gestion des logs pour l'audit
+Ajouter la gestion des logs pour l'audit : ok
+Ajouter une feature pour être notifier par courriel lorsqu'une erreur arrive : ok
 Ajouter un token generer pour la securité, ce sera juste un simple header
-Ajouter un process pour relancer les upload qui ont échoué au cas ou un proble arrive
+Ajouter un process pour relancer les upload qui ont échoué au cas ou un proble arrive : ok
 
 Tester le rollout

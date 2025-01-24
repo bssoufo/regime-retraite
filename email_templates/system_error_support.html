@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Erreur Système</title>
+</head>
+<body>
+    <p>Bonjour équipe de Support,</p>
+    <p>Une erreur système a été rencontrée le {{ error_date }}.</p>
+    <p>Utilisateur concerné : {{ user_email }}</p>
+    <p>Erreur : {{ error_message }}</p>
+    <p>Détails de l'erreur :</p>
+    <pre>{{ traceback }}</pre>
+    <p>Cordialement,<br>L'équipe</p>
+</body>
+</html>

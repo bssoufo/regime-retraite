@@ -180,3 +180,39 @@ def send_email(subject: str, template_name: str, context: dict, recipients: List
     except Exception as e:
         logger.error(f"Échec de l'envoi de l'e-mail à {recipients}: {e}")
 
+
+def envoyer_notification_erreur_systeme(user_email: str, error: Exception, traceback_str: str):
+    """
+    Envoie une notification par e-mail en cas d'erreur système.
+
+    Args:
+        user_email (str): Adresse e-mail de l'utilisateur concerné (si disponible).
+        error (Exception): L'exception survenue.
+        traceback_str (str): La trace complète de l'exception.
+    """
+    subject_support = "Erreur Système dans l'Application"
+    template_support = "system_error_support.html"
+    context_support = {
+        "user_email": user_email,
+        "error_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "error_message": str(error),
+        "traceback": traceback_str
+    }
+
+    # Récupération des adresses e-mail de support depuis les variables d'environnement
+    support_emails_str = os.getenv("SUPPORT_EMAILS", "")
+    support_emails = [email.strip() for email in support_emails_str.split(",") if email.strip()]
+
+    if support_emails:
+        try:
+            send_email(
+                subject=subject_support,
+                template_name=template_support,
+                context=context_support,
+                recipients=support_emails
+            )
+            logger.info(f"Notification d'erreur système envoyée à: {support_emails}")
+        except Exception as e:
+            logger.error(f"Erreur lors de l'envoi de la notification d'erreur système à {support_emails}: {e}")
+    else:
+        logger.warning("SUPPORT_EMAILS n'est pas défini correctement dans les variables d'environnement.")

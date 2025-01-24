@@ -6,8 +6,10 @@ from datetime import date
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
-from app.utils import create_upload_directory, create_identification_file, rename_file, logger
+from app.utils import create_upload_directory, create_identification_file, rename_file, logger,envoyer_notification_erreur_systeme
 from sharepoint_connector.sharepoint_uploader import upload_files_to_sharepoint
+import traceback
+from fastapi.responses import JSONResponse
 
 load_dotenv()
 
@@ -150,3 +152,34 @@ async def create_upload_files(
 
     logger.info(f"Upload response: {response}")
     return response
+
+@app.get("/cause-error")
+async def cause_error():
+    raise ValueError("Ceci est une erreur de test.")
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Gestionnaire d'exceptions global pour capturer toutes les exceptions non traitées.
+    """
+    # Enregistrer l'erreur avec la trace complète
+    error_trace = traceback.format_exc()
+    logger.error(f"Exception non gérée: {exc}\nTraceback: {error_trace}")
+
+    # Extraire l'adresse e-mail de l'utilisateur si disponible
+    try:
+        form = await request.form()
+        user_email = form.get("email", "Inconnu")
+    except Exception:
+        user_email = "Inconnu"
+
+    # Envoyer la notification d'erreur en arrière-plan
+    background_tasks = BackgroundTasks()
+    background_tasks.add_task(envoyer_notification_erreur_systeme, user_email, exc, error_trace)
+
+    # Retourner une réponse générique au client
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Une erreur interne s'est produite. L'équipe de support a été notifiée."},
+        background=background_tasks
+    )
