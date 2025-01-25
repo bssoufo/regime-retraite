@@ -1,9 +1,15 @@
 Ajouter la gestion des logs pour l'audit : ok
 Ajouter une feature pour être notifier par courriel lorsqu'une erreur arrive : ok
 Ajouter un token generer pour la securité, ce sera juste un simple header : ok
-Ajouter un process pour relancer les upload qui ont échoué au cas ou un proble arrive : ok
-Mettre a jour l'extension wordpress sous forme d'une plugin configurable au lieu d'avoir de modifier le fichier function
+Ajouter l'option retry dans le midllware au cas ou une transaction vers sharepoint echoue
+Mettre a jour les courriels de notifications avec les informations fournies par Evrald
+Ajouter un process pour relancer les upload qui ont échoué au cas ou un proble arrive : Un endpoint qui permettra de relancer tous les jobs qui ont échouer
+
+Mettre a jour l'extension wordpress sous forme d'une plugin configurable au lieu d'avoir de modifier le fichier function:70%
 Dans wordpress suprimer l'entrée une fois que le document sera reçu
+Mieux renonomer les variables dans wordpress et mettre si posible une definition
+
 Ne pas oublier de desactiver la soumission Ajax
+Corriger l'erreur php [25-Jan-2025 01:44:47 UTC] PHP Notice:  Function _load_textdomain_just_in_time was called <strong>incorrectly</strong>. Translation loading for the <code>wordpress-seo</code> domain was triggered too early. This is usually an indicator for some code in the plugin or theme running too early. Translations should be loaded at the <code>init</code> action or later. Please see <a href="https://developer.wordpress.org/advanced-administration/debug/debug-wordpress/">Debugging in WordPress</a> for more information. (This message was added in version 6.7.0.) in /nas/content/live/regimedstg/wp-includes/functions.php on line 6114
 Déploiement sur Azure
 Tester le rollout
