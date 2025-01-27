@@ -1,9 +1,9 @@
 Ajouter la gestion des logs pour l'audit : ok
 Ajouter une feature pour être notifier par courriel lorsqu'une erreur arrive : ok
 Ajouter un token generer pour la securité, ce sera juste un simple header : ok
-Ajouter l'option retry dans le midllware au cas ou une transaction vers sharepoint echoue
+Ajouter l'option retry dans le midllware au cas ou une transaction vers sharepoint echoue:ok
 Mettre a jour les courriels de notifications avec les informations fournies par Evrald : ok
-Ajouter un process pour relancer les upload qui ont échoué au cas ou un proble arrive : Un endpoint qui permettra de relancer tous les jobs qui ont échouer
+Ajouter un process pour relancer les upload qui ont échoué au cas ou un proble arrive : Un endpoint qui permettra de relancer tous les jobs qui ont échouer : ok
 
 Mettre a jour l'extension wordpress sous forme d'une plugin configurable au lieu d'avoir de modifier le fichier function:70%
 Dans wordpress suprimer l'entrée une fois que le document sera reçu

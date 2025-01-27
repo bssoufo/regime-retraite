@@ -2,7 +2,7 @@
 /*
 Plugin Name: SharePoint Connect
 Plugin URI: https://votre-site.com/sharepoint-connect
-Description: Connecte Formidable Forms à SharePoint via FastAPI.
+Description: Connecte Formidable Forms à SharePoint.
 Version: 1.3
 Author: Votre Nom
 Author URI: https://votre-site.com
@@ -30,7 +30,7 @@ class SharePoint_Connect {
 
     private function __construct() {
         // Initialize settings
-        $this->settings = get_option( 'spc_settings', $this->default_settings() );
+        $this->settings = wp_parse_args( get_option( 'spc_settings', array() ), $this->default_settings() );
 
         // Admin menu
         add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
@@ -45,23 +45,21 @@ class SharePoint_Connect {
         add_action( 'frm_after_create_entry', array( $this, 'send_files_to_fastapi' ), 10, 2 );
 
         // Load plugin textdomain for translations
-        add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
+        add_action( 'init', array( $this, 'load_textdomain' ) );
     }
 
     private function default_settings() {
         return array(
-            'form_id'             => '',
-            'fastapi_url'        => '',
-            'api_token'          => '',
-            'field_mappings'     => array(
-                'name'          => '',
-                'date_of_birth' => '',
-                'email'         => '',
-                'files'         => '',
-            ),
-            'doc_id_key'          => '', // Nouveau champ ajouté
-            'doc_type_key'        => '', // Nouveau champ ajouté
-            'relative_file_path' => 'wp-content/documents-private/',
+            'form_id'               => '',
+            'sharepoint_connect_url'=> '',
+            'api_token'             => '',
+            'name_field_id'         => '',
+            'date_of_birth_field_id'=> '',
+            'email_field_id'        => '',
+            'files_field_id'        => '',
+            'doc_id_key'            => '',
+            'doc_type_key'          => '',
+            'relative_file_path'    => 'wp-content/documents-private/',
         );
     }
 
@@ -89,7 +87,7 @@ class SharePoint_Connect {
             'sharepoint-connect'
         );
 
-        // Form ID
+        // ID du Formulaire
         add_settings_field(
             'form_id',
             __( 'ID du Formulaire', 'sharepoint-connect' ),
@@ -98,16 +96,16 @@ class SharePoint_Connect {
             'spc_main_section'
         );
 
-        // FastAPI URL
+        // URL de SharePoint Connect
         add_settings_field(
-            'fastapi_url',
-            __( 'URL de FastAPI', 'sharepoint-connect' ),
-            array( $this, 'fastapi_url_callback' ),
+            'sharepoint_connect_url',
+            __( 'URL de SharePoint Connect', 'sharepoint-connect' ),
+            array( $this, 'sharepoint_connect_url_callback' ),
             'sharepoint-connect',
             'spc_main_section'
         );
 
-        // API Token
+        // Token API
         add_settings_field(
             'api_token',
             __( 'Token API', 'sharepoint-connect' ),
@@ -116,16 +114,43 @@ class SharePoint_Connect {
             'spc_main_section'
         );
 
-        // Field Mappings
+        // Mappings des Champs - Nom
         add_settings_field(
-            'field_mappings',
-            __( 'Mappages des Champs', 'sharepoint-connect' ),
-            array( $this, 'field_mappings_callback' ),
+            'name_field_id',
+            __( 'Nom', 'sharepoint-connect' ),
+            array( $this, 'name_field_id_callback' ),
             'sharepoint-connect',
             'spc_main_section'
         );
 
-        // Doc ID Key (Nouveau champ)
+        // Mappings des Champs - Date de Naissance
+        add_settings_field(
+            'date_of_birth_field_id',
+            __( 'Date de Naissance', 'sharepoint-connect' ),
+            array( $this, 'date_of_birth_field_id_callback' ),
+            'sharepoint-connect',
+            'spc_main_section'
+        );
+
+        // Mappings des Champs - Email
+        add_settings_field(
+            'email_field_id',
+            __( 'Email', 'sharepoint-connect' ),
+            array( $this, 'email_field_id_callback' ),
+            'sharepoint-connect',
+            'spc_main_section'
+        );
+
+        // Mappings des Champs - Fichiers
+        add_settings_field(
+            'files_field_id',
+            __( 'Fichiers', 'sharepoint-connect' ),
+            array( $this, 'files_field_id_callback' ),
+            'sharepoint-connect',
+            'spc_main_section'
+        );
+
+        // Clé ID du Document
         add_settings_field(
             'doc_id_key',
             __( 'Clé ID du Document', 'sharepoint-connect' ),
@@ -134,7 +159,7 @@ class SharePoint_Connect {
             'spc_main_section'
         );
 
-        // Doc Type Key (Nouveau champ)
+        // Clé Type du Document
         add_settings_field(
             'doc_type_key',
             __( 'Clé Type du Document', 'sharepoint-connect' ),
@@ -143,7 +168,7 @@ class SharePoint_Connect {
             'spc_main_section'
         );
 
-        // Relative File Path
+        // Chemin Relatif des Fichiers
         add_settings_field(
             'relative_file_path',
             __( 'Chemin Relatif des Fichiers', 'sharepoint-connect' ),
@@ -157,29 +182,20 @@ class SharePoint_Connect {
         $sanitized = array();
 
         $sanitized['form_id'] = intval( $input['form_id'] );
-        $sanitized['fastapi_url'] = esc_url_raw( $input['fastapi_url'] );
+        $sanitized['sharepoint_connect_url'] = esc_url_raw( $input['sharepoint_connect_url'] );
         $sanitized['api_token'] = sanitize_text_field( $input['api_token'] );
 
-        $sanitized['field_mappings'] = array(
-            'name'          => sanitize_text_field( $input['field_mappings']['name'] ),
-            'date_of_birth' => sanitize_text_field( $input['field_mappings']['date_of_birth'] ),
-            'email'         => sanitize_text_field( $input['field_mappings']['email'] ),
-            'files'         => sanitize_text_field( $input['field_mappings']['files'] ),
-        );
+        $sanitized['name_field_id'] = sanitize_text_field( $input['name_field_id'] );
+        $sanitized['date_of_birth_field_id'] = sanitize_text_field( $input['date_of_birth_field_id'] );
+        $sanitized['email_field_id'] = sanitize_text_field( $input['email_field_id'] );
+        $sanitized['files_field_id'] = sanitize_text_field( $input['files_field_id'] );
 
-        $sanitized['doc_id_key'] = sanitize_text_field( $input['doc_id_key'] ); // Sanitisation du nouveau champ
-        $sanitized['doc_type_key'] = sanitize_text_field( $input['doc_type_key'] ); // Sanitisation du nouveau champ
-
+        $sanitized['doc_id_key'] = sanitize_text_field( $input['doc_id_key'] );
+        $sanitized['doc_type_key'] = sanitize_text_field( $input['doc_type_key'] );
         $sanitized['relative_file_path'] = sanitize_text_field( $input['relative_file_path'] );
 
         // Logs de débogage
-        error_log( "SharePoint Connect: 'name' field mapping sanitized value: " . $sanitized['field_mappings']['name'] );
-        error_log( "SharePoint Connect: 'date_of_birth' field mapping sanitized value: " . $sanitized['field_mappings']['date_of_birth'] );
-        error_log( "SharePoint Connect: 'email' field mapping sanitized value: " . $sanitized['field_mappings']['email'] );
-        error_log( "SharePoint Connect: 'files' field mapping sanitized value: " . $sanitized['field_mappings']['files'] );
-        error_log( "SharePoint Connect: 'doc_id_key' sanitized value: " . $sanitized['doc_id_key'] );
-        error_log( "SharePoint Connect: 'doc_type_key' sanitized value: " . $sanitized['doc_type_key'] );
-
+        error_log( "SharePoint Connect: Sanitized settings: " . wp_json_encode( $sanitized ) );
         return $sanitized;
     }
 
@@ -198,75 +214,90 @@ class SharePoint_Connect {
         <?php
     }
 
-    // Callbacks for settings fields
+    // Callbacks pour chaque champ individuel
+
+    // ID du Formulaire
     public function form_id_callback() {
         printf(
             '<input type="number" id="form_id" name="spc_settings[form_id]" value="%s" />',
             esc_attr( $this->settings['form_id'] )
         );
+        echo '<p class="description">' . __( 'Entrez l\'ID du formulaire Formidable Forms que vous souhaitez connecter à SharePoint.', 'sharepoint-connect' ) . '</p>';
     }
 
-    public function fastapi_url_callback() {
+    // URL de SharePoint Connect
+    public function sharepoint_connect_url_callback() {
         printf(
-            '<input type="url" id="fastapi_url" name="spc_settings[fastapi_url]" value="%s" size="50" />',
-            esc_attr( $this->settings['fastapi_url'] )
+            '<input type="url" id="sharepoint_connect_url" name="spc_settings[sharepoint_connect_url]" value="%s" size="50" />',
+            esc_attr( $this->settings['sharepoint_connect_url'] )
         );
+        echo '<p class="description">' . __( 'Entrez l\'URL de votre service SharePoint Connect.', 'sharepoint-connect' ) . '</p>';
     }
 
+    // Token API
     public function api_token_callback() {
         printf(
             '<input type="text" id="api_token" name="spc_settings[api_token]" value="%s" size="50" />',
             esc_attr( $this->settings['api_token'] )
         );
+        echo '<p class="description">' . __( 'Entrez votre token API pour authentifier les requêtes vers SharePoint.', 'sharepoint-connect' ) . '</p>';
     }
 
-    public function field_mappings_callback() {
-        $mappings = $this->settings['field_mappings'];
-        ?>
-        <table class="form-table">
-            <tr>
-                <th><?php _e( 'Champ', 'sharepoint-connect' ); ?></th>
-                <th><?php _e( 'ID du Champ Formidable', 'sharepoint-connect' ); ?></th>
-            </tr>
-            <tr>
-                <td><?php _e( 'Nom', 'sharepoint-connect' ); ?></td>
-                <td><input type="text" name="spc_settings[field_mappings][name]" value="<?php echo esc_attr( $mappings['name'] ); ?>" /></td>
-            </tr>
-            <tr>
-                <td><?php _e( 'Date de Naissance', 'sharepoint-connect' ); ?></td>
-                <td><input type="text" name="spc_settings[field_mappings][date_of_birth]" value="<?php echo esc_attr( $mappings['date_of_birth'] ); ?>" /></td>
-            </tr>
-            <tr>
-                <td><?php _e( 'Email', 'sharepoint-connect' ); ?></td>
-                <td><input type="text" name="spc_settings[field_mappings][email]" value="<?php echo esc_attr( $mappings['email'] ); ?>" /></td>
-            </tr>
-            <tr>
-                <td><?php _e( 'Fichiers', 'sharepoint-connect' ); ?></td>
-                <td><input type="text" name="spc_settings[field_mappings][files]" value="<?php echo esc_attr( $mappings['files'] ); ?>" /></td>
-            </tr>
-        </table>
-        <p class="description"><?php _e( 'Entrez les IDs des champs de votre formulaire Formidable Forms.', 'sharepoint-connect' ); ?></p>
-        <?php
+    // Nom Field ID
+    public function name_field_id_callback() {
+        printf(
+            '<input type="text" id="name_field_id" name="spc_settings[name_field_id]" value="%s" size="50" />',
+            esc_attr( $this->settings['name_field_id'] )
+        );
+        echo '<p class="description">' . __( 'Entrez la clé qui permet d\'obtenir le nom dans le post du formulaire Formidable Forms.', 'sharepoint-connect' ) . '</p>';
     }
 
-    // Callback pour Doc ID Key
+    // Date de Naissance Field ID
+    public function date_of_birth_field_id_callback() {
+        printf(
+            '<input type="text" id="date_of_birth_field_id" name="spc_settings[date_of_birth_field_id]" value="%s" size="50" />',
+            esc_attr( $this->settings['date_of_birth_field_id'] )
+        );
+        echo '<p class="description">' . __( 'Entrez la clé qui permet d\'obtenir la date de naissance dans le post du formulaire Formidable Forms.', 'sharepoint-connect' ) . '</p>';
+    }
+
+    // Email Field ID
+    public function email_field_id_callback() {
+        printf(
+            '<input type="text" id="email_field_id" name="spc_settings[email_field_id]" value="%s" size="50" />',
+            esc_attr( $this->settings['email_field_id'] )
+        );
+        echo '<p class="description">' . __( 'Entrez la clé qui permet d\'obtenir l\'email dans le post du formulaire Formidable Forms.', 'sharepoint-connect' ) . '</p>';
+    }
+
+    // Fichiers Field ID
+    public function files_field_id_callback() {
+        printf(
+            '<input type="text" id="files_field_id" name="spc_settings[files_field_id]" value="%s" size="50" />',
+            esc_attr( $this->settings['files_field_id'] )
+        );
+        echo '<p class="description">' . __( 'Entrez la clé qui permet d\'obtenir le tableau de fichiers dans le post du formulaire Formidable Forms.', 'sharepoint-connect' ) . '</p>';
+    }
+
+    // Clé ID du Document
     public function doc_id_key_callback() {
         printf(
             '<input type="text" id="doc_id_key" name="spc_settings[doc_id_key]" value="%s" size="50" />',
             esc_attr( $this->settings['doc_id_key'] )
         );
-        echo '<p class="description">' . __( 'Entrez la clé pour l\'ID du document.', 'sharepoint-connect' ) . '</p>';
+        echo '<p class="description">' . __( 'Entrez la clé pour l\'ID du document dans le tableau de fichiers.', 'sharepoint-connect' ) . '</p>';
     }
 
-    // Callback pour Doc Type Key
+    // Clé Type du Document
     public function doc_type_key_callback() {
         printf(
             '<input type="text" id="doc_type_key" name="spc_settings[doc_type_key]" value="%s" size="50" />',
             esc_attr( $this->settings['doc_type_key'] )
         );
-        echo '<p class="description">' . __( 'Entrez la clé pour le type de document.', 'sharepoint-connect' ) . '</p>';
+        echo '<p class="description">' . __( 'Entrez la clé pour le type de document dans le tableau de fichiers.', 'sharepoint-connect' ) . '</p>';
     }
 
+    // Chemin Relatif des Fichiers
     public function relative_file_path_callback() {
         printf(
             '<input type="text" id="relative_file_path" name="spc_settings[relative_file_path]" value="%s" size="50" />',
@@ -283,33 +314,34 @@ class SharePoint_Connect {
     }
 
     /**
-     * Fonction principale pour envoyer les fichiers à FastAPI
+     * Fonction principale pour envoyer les fichiers à SharePoint
      */
     public function send_files_to_fastapi( $entry_id, $form_id ) {
-        if ( $form_id != $this->settings['form_id'] ) { // Vérifie le Form ID
-            return;
+        if ( (int) $form_id !== (int) $this->settings['form_id'] ) {
+            return; // Ignore si ce n'est pas le bon formulaire
         }
 
         // Vérifie si $_POST['item_meta'] est défini
         if ( ! isset( $_POST['item_meta'] ) || ! is_array( $_POST['item_meta'] ) ) {
-            // Correction de la ligne d'erreur
             error_log( "SharePoint Connect: 'item_meta' n'est pas défini ou n'est pas un tableau pour l'entrée ID $entry_id." );
             return;
         }
+        $item_meta = $_POST['item_meta'];
 
         // Récupère les champs mappés depuis les paramètres
-        $name_field_id           = intval( $this->settings['field_mappings']['name'] );
-        $date_of_birth_field_id  = intval( $this->settings['field_mappings']['date_of_birth'] );
-        $email_field_id          = intval( $this->settings['field_mappings']['email'] );
-        $files_field_id          = intval( $this->settings['field_mappings']['files'] );
+        $name_field_id           = isset($this->settings['name_field_id']) ? intval( $this->settings['name_field_id'] ) : null;
+        $date_of_birth_field_id  = isset($this->settings['date_of_birth_field_id']) ? intval( $this->settings['date_of_birth_field_id'] ) : null;
+        $email_field_id          = isset($this->settings['email_field_id']) ? intval( $this->settings['email_field_id'] ) : null;
+        $files_field_id          = isset($this->settings['files_field_id']) ? intval( $this->settings['files_field_id'] ) : null;
         $doc_id_key              = sanitize_text_field( $this->settings['doc_id_key'] );
         $doc_type_key            = sanitize_text_field( $this->settings['doc_type_key'] );
 
+
         // Récupère les données de l'entrée via $_POST['item_meta']
-        $name          = isset( $_POST['item_meta'][ $name_field_id ] ) ? sanitize_text_field( $_POST['item_meta'][ $name_field_id ] ) : '';
-        $date_of_birth = isset( $_POST['item_meta'][ $date_of_birth_field_id ] ) ? sanitize_text_field( $_POST['item_meta'][ $date_of_birth_field_id ] ) : '';
-        $email         = isset( $_POST['item_meta'][ $email_field_id ] ) ? sanitize_email( $_POST['item_meta'][ $email_field_id ] ) : '';
-        $files         = isset( $_POST['item_meta'][ $files_field_id ] ) ? $_POST['item_meta'][ $files_field_id ] : array();
+        $name          = $name_field_id && isset( $item_meta[ $name_field_id ] ) ? sanitize_text_field( $item_meta[ $name_field_id ] ) : '';
+        $date_of_birth = $date_of_birth_field_id && isset( $item_meta[ $date_of_birth_field_id ] ) ? sanitize_text_field( $item_meta[ $date_of_birth_field_id ] ) : '';
+        $email         = $email_field_id && isset( $item_meta[ $email_field_id ] ) ? sanitize_email( $item_meta[ $email_field_id ] ) : '';
+        $files         = $files_field_id && isset( $item_meta[ $files_field_id ] ) ? $item_meta[ $files_field_id ] : array();
 
         // Logs de débogage
         error_log( "SharePoint Connect: Récupération des champs pour l'entrée ID $entry_id." );
@@ -321,18 +353,14 @@ class SharePoint_Connect {
             return;
         }
 
-        var_dump( $files );
-
-        die();
-        
         $files_and_docs = array();
-
         foreach ( $files as $file ) {
             if ( isset( $file[$doc_id_key ] ) && isset( $file[$doc_type_key] ) ) {
-                $file_id  = intval( $file[$doc_id_key] ); // ID du fichier
-                $doc_type = sanitize_text_field( $file[$doc_type_key] ); // Type de document
+                $file_id  = intval( $file[$doc_id_key] );
+                $doc_type = sanitize_text_field( $file[$doc_type_key] );
 
                 $file_path = $this->resolve_file_path( $file_id );
+
                 if ( $file_path && file_exists( $file_path ) ) {
                     $files_and_docs[] = array(
                         'file' => $file_path,
@@ -341,6 +369,8 @@ class SharePoint_Connect {
                 } else {
                     error_log( "SharePoint Connect: Fichier introuvable ou non lisible pour l'ID $file_id." );
                 }
+            } else {
+                error_log( "SharePoint Connect: Données de fichier incomplètes pour un des fichiers : " . wp_json_encode($file));
             }
         }
 
@@ -349,7 +379,7 @@ class SharePoint_Connect {
             return;
         }
 
-        // Prépare les données POST pour FastAPI
+        // Prépare les données POST pour SharePoint
         $post_fields = array(
             'name'          => $name,
             'date_of_birth' => $date_of_birth,
@@ -375,11 +405,12 @@ class SharePoint_Connect {
             }
         }
 
+
         // Initialise cURL
         $ch = curl_init();
 
         // Définir les options cURL
-        curl_setopt( $ch, CURLOPT_URL, $this->settings['fastapi_url'] );
+        curl_setopt( $ch, CURLOPT_URL, $this->settings['sharepoint_connect_url'] );
         curl_setopt( $ch, CURLOPT_POST, true );
         curl_setopt( $ch, CURLOPT_POSTFIELDS, $post_fields );
         curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
@@ -410,15 +441,16 @@ class SharePoint_Connect {
             // update_post_meta( $entry_id, 'spc_response', $response );
         } else {
             // Enregistrer l'erreur
-            error_log( "SharePoint Connect: FastAPI responded with status code $http_code. Response: $response" );
+            error_log( "SharePoint Connect: SharePoint responded with status code $http_code. Response: $response" );
         }
     }
+
 
     /**
      * Résout le chemin du fichier en fonction de l'ID
      */
     private function resolve_file_path( $file_id ) {
-        $relative_path      = trailingslashit( $this->settings['relative_file_path'] );
+        $relative_path = trailingslashit( $this->settings['relative_file_path'] );
         $file_path_original = get_attached_file( $file_id );
 
         if ( ! $file_path_original ) {
@@ -427,8 +459,6 @@ class SharePoint_Connect {
         }
 
         $file_name = basename( $file_path_original );
-
-        // Construire le chemin relatif complet
         $file_path = ABSPATH . $relative_path . $file_name;
 
         // Modifier les permissions pour rendre le fichier lisible
@@ -465,5 +495,3 @@ class SharePoint_Connect {
 
 // Initialiser le plugin
 SharePoint_Connect::get_instance();
-
-?>

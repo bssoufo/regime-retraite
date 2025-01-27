@@ -259,3 +259,29 @@ def get_api_key(api_key: Optional[str] = Security(api_key_header)) -> str:
         )
     
     return api_key
+def get_user_email(upload_dir: str) -> Optional[str]:
+    """
+    Extrait l'email de l'utilisateur depuis le fichier identification_client.txt.
+
+    Args:
+        upload_dir (str): Chemin vers le répertoire d'upload.
+
+    Returns:
+        Optional[str]: Adresse email de l'utilisateur si trouvé, sinon None.
+    """
+    identification_file = os.path.join(upload_dir, "identification_client.txt")
+    if not os.path.isfile(identification_file):
+        logger.warning(f"Le fichier {identification_file} n'existe pas.")
+        return None
+    
+    try:
+        with open(identification_file, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("Email:"):
+                    email = line.split("Email:")[1].strip()
+                    logger.info(f"Extracted user email: {email}")
+                    return email
+    except Exception as e:
+        logger.error(f"Erreur lors de la lecture du fichier {identification_file}: {e}")
+    
+    return None

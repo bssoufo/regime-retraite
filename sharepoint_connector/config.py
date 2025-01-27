@@ -18,4 +18,5 @@ TARGET_FOLDER_RELATIVE_URL =os.getenv("TARGET_FOLDER_RELATIVE_URL")
 SCOPE = os.getenv("SCOPE")
 SCOPE = [SCOPE]
 AUTHORITY = os.getenv("AUTHORITY")
-
+RETRY_COUNT = int(os.getenv("RETRY_COUNT", 3))
+RETRY_DELAY = int(os.getenv("RETRY_DELAY", 5))  # seconds

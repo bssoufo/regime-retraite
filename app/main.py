@@ -20,6 +20,7 @@ from app.utils import (
     logger,
     envoyer_notification_erreur_systeme,
     get_api_key,
+    get_user_email,
     API_KEY_NAME
 )
 
@@ -241,3 +242,48 @@ async def security_middleware(request: Request, call_next):
 @app.get("/cause-error")
 async def cause_error():
     raise ValueError("Ceci est une erreur de test.")
+
+@app.post("/retry-failed-uploads/")
+async def retry_failed_uploads(background_tasks: BackgroundTasks):
+    """
+    Endpoint pour relancer les uploads échoués.
+    Parcourt tous les dossiers dans `uploaded_files/` et relance le processus
+    d'upload vers SharePoint si le dossier existe encore.
+    """
+    if not os.path.exists(UPLOAD_DIRECTORY):
+        # S'il n'y a pas de dossier du tout, on retourne un message sans erreur
+        return {"message": f"Le répertoire {UPLOAD_DIRECTORY} n'existe pas ou est vide."}
+    
+    # Récupérer la liste de tous les dossiers dans UPLOAD_DIRECTORY
+    subdirs = [
+        os.path.join(UPLOAD_DIRECTORY, d) for d in os.listdir(UPLOAD_DIRECTORY)
+        if os.path.isdir(os.path.join(UPLOAD_DIRECTORY, d))
+    ]
+    
+    if not subdirs:
+        return {"message": "Aucun dossier à relancer. Tous les uploads sont peut-être déjà traités."}
+    
+    # Pour accumuler des informations sur ce qui va être relancé
+    relaunch_info = []
+    
+    for subdir in subdirs:
+        # On récupère l'email en lisant identification_client.txt
+        user_email = get_user_email(subdir)
+        if not user_email:
+            # Si pas d'email, on ignore ou on log un warning
+            logger.warning(f"Aucun email trouvé dans le dossier {subdir}. Upload non relancé.")
+            continue
+        
+        # Ajout de la tâche d'upload en arrière-plan
+        background_tasks.add_task(upload_files_to_sharepoint, subdir, user_email)
+        relaunch_info.append({
+            "folder": subdir,
+            "email": user_email,
+            "status": "Relance programmée"
+        })
+    
+    # Réponse de l'API
+    return {
+        "message": "La relance des uploads échoués a été lancée en arrière-plan.",
+        "details": relaunch_info
+    }

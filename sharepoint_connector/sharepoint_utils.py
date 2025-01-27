@@ -1,6 +1,10 @@
+# File: sharepoint_connector/sharepoint_utils.py
+
 import os
 import requests
-from sharepoint_connector.config import SITE_URL
+import time
+from sharepoint_connector.config import RETRY_COUNT, RETRY_DELAY
+from app.utils import logger
 
 def create_folder(site_url, target_folder_relative_url, headers, form_digest_value):
     post_headers = headers.copy()
@@ -13,8 +17,22 @@ def create_folder(site_url, target_folder_relative_url, headers, form_digest_val
         "__metadata": {"type": "SP.Folder"},
         "ServerRelativeUrl": target_folder_relative_url
     }
-    response = requests.post(folder_endpoint, headers=post_headers, json=payload)
-    return response
+
+    for attempt in range(RETRY_COUNT + 1):
+        try:
+            response = requests.post(folder_endpoint, headers=post_headers, json=payload)
+            response.raise_for_status()
+            return response
+        except requests.exceptions.RequestException as e:
+            if attempt < RETRY_COUNT:
+                logger.warning(
+                    f"Attempt {attempt+1}/{RETRY_COUNT+1} failed to create folder {target_folder_relative_url}. "
+                    f"Retrying in {RETRY_DELAY}s. Error: {str(e)}"
+                )
+                time.sleep(RETRY_DELAY)
+            else:
+                logger.error(f"All attempts failed to create folder {target_folder_relative_url}")
+                raise
 
 def upload_file_local(site_url, target_folder_relative_url, local_file_path, headers, form_digest_value):
     post_headers = headers.copy()
@@ -27,11 +45,24 @@ def upload_file_local(site_url, target_folder_relative_url, local_file_path, hea
         f"{site_url}/_api/web/GetFolderByServerRelativeUrl('{target_folder_relative_url}')"
         f"/Files/add(url='{filename}',overwrite=true)"
     )
-    with open(local_file_path, "rb") as f:
-        file_content = f.read()
-    response = requests.post(upload_endpoint, headers=post_headers, data=file_content)
-    return response
 
+    for attempt in range(RETRY_COUNT + 1):
+        try:
+            with open(local_file_path, "rb") as f:
+                file_content = f.read()
+            response = requests.post(upload_endpoint, headers=post_headers, data=file_content)
+            response.raise_for_status()
+            return response
+        except (requests.exceptions.RequestException, IOError) as e:
+            if attempt < RETRY_COUNT:
+                logger.warning(
+                    f"Attempt {attempt+1}/{RETRY_COUNT+1} failed to upload {filename}. "
+                    f"Retrying in {RETRY_DELAY}s. Error: {str(e)}"
+                )
+                time.sleep(RETRY_DELAY)
+            else:
+                logger.error(f"All attempts failed to upload {filename}")
+                raise
 def upload_file_from_url(site_url, target_folder_relative_url, file_url, headers, form_digest_value):
     post_headers = headers.copy()
     post_headers.update({
