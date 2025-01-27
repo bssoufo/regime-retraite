@@ -48,3 +48,4 @@ poetry.lock
 
 # Specific to this project
 # If you have any other specific file you want to ignore, put them here.
+logs/

@@ -1,3 +1,0 @@
-Nom: Raba test
-Date de naissance: 01/25/2025
-Email: raba@gmail.com

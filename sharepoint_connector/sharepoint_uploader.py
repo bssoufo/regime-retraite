@@ -78,8 +78,11 @@ def upload_files_to_sharepoint(local_directory: str, email: str) -> bool:
         # Chemin du dossier SharePoint pour les e-mails (dossier racine cible)
         sharepoint_folder_email = target_folder
 
+        # Construire le lien SharePoint
+        sharepoint_link = construct_sharepoint_link(sharepoint_folder_email)
+
         # Si tous les uploads ont réussi
-        envoyer_notifications_success(email, user_name, sharepoint_folder_email)
+        envoyer_notifications_success(email, user_name, sharepoint_link)
 
         # Supprimer le dossier temporaire sur le disque
         try:
@@ -94,21 +97,39 @@ def upload_files_to_sharepoint(local_directory: str, email: str) -> bool:
         envoyer_notifications_failure(e, email)
         return False
 
-def envoyer_notifications_success(user_email: str, user_name: str, sharepoint_folder: str):
+def construct_sharepoint_link(sharepoint_folder_relative_path: str) -> str:
+    """
+    Constructs the full SharePoint URL for a given relative folder path.
+
+    Args:
+        sharepoint_folder_relative_path (str): The server-relative URL of the SharePoint folder.
+
+    Returns:
+        str: The full URL to access the SharePoint folder.
+    """
+    # Ensure there's no leading slash to prevent double slashes in URL
+    if sharepoint_folder_relative_path.startswith("/"):
+        sharepoint_folder_relative_path = sharepoint_folder_relative_path[1:]
+    
+    # Construct the full URL
+    sharepoint_link = f"{SITE_URL}/{sharepoint_folder_relative_path}"
+    return sharepoint_link
+
+def envoyer_notifications_success(user_email: str, user_name: str, sharepoint_link: str):
     """
     Envoie des notifications par e-mail en cas de succès de l'upload.
 
     Args:
         user_email (str): Adresse e-mail de l'utilisateur.
         user_name (str): Nom de l'utilisateur.
-        sharepoint_folder (str): Chemin du dossier SharePoint.
+        sharepoint_link (str): URL du dossier SharePoint.
     """
     # Date actuelle
     upload_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Contenu des e-mails
     # Email de confirmation à l'utilisateur
-    subject_user = "Confirmation d'Upload vers SharePoint"
+    subject_user = "Confirmation de réception de vos documents"
     template_user = "upload_success_user.html"
     context_user = {
         "user_name": user_name,
@@ -116,12 +137,12 @@ def envoyer_notifications_success(user_email: str, user_name: str, sharepoint_fo
     }
 
     # Email informatif à l'équipe de régime retraite
-    subject_regime = "Nouvel Upload de Fichiers"
+    subject_regime = "Nouvelle soumission de documents"
     template_regime = "upload_success_regime.html"
     context_regime = {
-        "user_name": user_name,
-        "upload_date": upload_date,
-        "sharepoint_folder": sharepoint_folder
+        "participant_name": user_name,
+        "participant_email": user_email,
+        "sharepoint_link": sharepoint_link  # Ajout du lien SharePoint
     }
 
     # Récupération des adresses e-mail depuis les variables d'environnement
@@ -130,6 +151,7 @@ def envoyer_notifications_success(user_email: str, user_name: str, sharepoint_fo
     # Envoi des e-mails
     if regime_email:
         try:
+            # Envoyer à l'utilisateur
             send_email(
                 subject=subject_user,
                 template_name=template_user,
@@ -141,6 +163,7 @@ def envoyer_notifications_success(user_email: str, user_name: str, sharepoint_fo
             logger.error(f"Erreur lors de l'envoi de l'email de confirmation à {user_email}: {e}")
         
         try:
+            # Envoyer à l'équipe de Régime Retraite
             send_email(
                 subject=subject_regime,
                 template_name=template_regime,

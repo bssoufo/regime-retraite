@@ -2,12 +2,14 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Nouvel Upload de Fichiers</title>
+    <title>Transmission de Documents</title>
 </head>
 <body>
-    <p>Bonjour équipe de Régime Retraite,</p>
-    <p>L'utilisateur <strong>{{ user_name }}</strong> a uploadé des fichiers vers SharePoint le {{ upload_date }}.</p>
-    <p>Veuillez vérifier les fichiers dans le répertoire suivant : <strong>{{ sharepoint_folder }}</strong></p>
-    <p>Cordialement,<br>L'équipe</p>
+    <p>Bonjour,</p>
+    <p>{{ participant_name }} vous a transmis des documents dans son dossier {{ participant_email }}. Vérifiez que vous avez bien reçu tous les documents.</p>
+    <p>Pour toute question, contactez {{ participant_name }} via l’adresse courriel {{ participant_email }}.</p>
+    <p>Vous pouvez accéder directement au dossier du participant via le lien suivant :</p>
+    <p><a href="https://regimeretraite.sharepoint.com/sites/portail/Archives/Dossier-Client/{{ participant_email }}" target="_blank">Accéder au dossier SharePoint</a></p>
+    <p>Merci</p>
 </body>
 </html>

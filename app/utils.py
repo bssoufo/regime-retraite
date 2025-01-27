@@ -15,7 +15,7 @@ import logging
 import shutil
 from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
-
+from email.utils import formataddr
 
 # Définir le nom de l'en-tête où le token sera attendu
 API_KEY_NAME = "X-API-Token"
@@ -145,6 +145,8 @@ def get_user_name(upload_dir: str) -> Optional[str]:
     
     return None
 
+# File: app/utils.py
+
 def send_email(subject: str, template_name: str, context: dict, recipients: List[str], sender_name: Optional[str] = None, sender_email: Optional[str] = None):
     """
     Envoie un e-mail au format HTML en utilisant un template.
@@ -159,6 +161,7 @@ def send_email(subject: str, template_name: str, context: dict, recipients: List
     """
     sender_name = sender_name or os.getenv("SMTP_SENDER_NAME")
     sender_email = sender_email or os.getenv("SMTP_SENDER_EMAIL")
+    print(sender_email)
     smtp_host = os.getenv("SMTP_HOST")
     smtp_port = int(os.getenv("SMTP_PORT", 587))
     smtp_user = os.getenv("SMTP_USER")
@@ -173,7 +176,7 @@ def send_email(subject: str, template_name: str, context: dict, recipients: List
         raise
 
     msg = MIMEMultipart()
-    msg['From'] = f"{sender_name} <{sender_email}>"
+    msg['From'] = formataddr((sender_name, sender_email))
     msg['To'] = ", ".join(recipients)
     msg['Subject'] = subject
 
@@ -187,7 +190,6 @@ def send_email(subject: str, template_name: str, context: dict, recipients: List
         logger.info(f"Email envoyé à {recipients} avec le sujet '{subject}'")
     except Exception as e:
         logger.error(f"Échec de l'envoi de l'e-mail à {recipients}: {e}")
-
 
 def envoyer_notification_erreur_systeme(user_email: str, error: Exception, traceback_str: str):
     """
