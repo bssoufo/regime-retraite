@@ -3,7 +3,7 @@
 Plugin Name: SharePoint Connect
 Plugin URI: https://votre-site.com/sharepoint-connect
 Description: Connecte Formidable Forms à SharePoint.
-Version: 1.3
+Version: 1.4
 Author: Votre Nom
 Author URI: https://votre-site.com
 License: GPL2
@@ -50,16 +50,17 @@ class SharePoint_Connect {
 
     private function default_settings() {
         return array(
-            'form_id'               => '',
-            'sharepoint_connect_url'=> '',
-            'api_token'             => '',
-            'name_field_id'         => '',
-            'date_of_birth_field_id'=> '',
-            'email_field_id'        => '',
-            'files_field_id'        => '',
-            'doc_id_key'            => '',
-            'doc_type_key'          => '',
-            'relative_file_path'    => 'wp-content/documents-private/',
+            'form_id'                 => '',
+            'sharepoint_connect_url'  => '',
+            'api_token'               => '',
+            'name_field_id'           => '',
+            'date_of_birth_field_id'  => '',
+            'email_field_id'          => '',
+            'files_field_id'          => '',
+            'doc_id_key'              => '',
+            'doc_type_key'            => '',
+            'relative_file_path'      => 'wp-content/documents-private/',
+            'delete_on_success'       => false, // Nouveau paramètre par défaut
         );
     }
 
@@ -176,23 +177,35 @@ class SharePoint_Connect {
             'sharepoint-connect',
             'spc_main_section'
         );
+
+        // Nouvelle option : Supprimer l'entrée et les fichiers après succès
+        add_settings_field(
+            'delete_on_success',
+            __( 'Supprimer l\'entrée et les fichiers après envoi réussi', 'sharepoint-connect' ),
+            array( $this, 'delete_on_success_callback' ),
+            'sharepoint-connect',
+            'spc_main_section'
+        );
     }
 
     public function sanitize_settings( $input ) {
         $sanitized = array();
 
-        $sanitized['form_id'] = intval( $input['form_id'] );
-        $sanitized['sharepoint_connect_url'] = esc_url_raw( $input['sharepoint_connect_url'] );
-        $sanitized['api_token'] = sanitize_text_field( $input['api_token'] );
+        $sanitized['form_id']                 = intval( $input['form_id'] );
+        $sanitized['sharepoint_connect_url']  = esc_url_raw( $input['sharepoint_connect_url'] );
+        $sanitized['api_token']               = sanitize_text_field( $input['api_token'] );
 
-        $sanitized['name_field_id'] = sanitize_text_field( $input['name_field_id'] );
-        $sanitized['date_of_birth_field_id'] = sanitize_text_field( $input['date_of_birth_field_id'] );
-        $sanitized['email_field_id'] = sanitize_text_field( $input['email_field_id'] );
-        $sanitized['files_field_id'] = sanitize_text_field( $input['files_field_id'] );
+        $sanitized['name_field_id']           = sanitize_text_field( $input['name_field_id'] );
+        $sanitized['date_of_birth_field_id']  = sanitize_text_field( $input['date_of_birth_field_id'] );
+        $sanitized['email_field_id']          = sanitize_text_field( $input['email_field_id'] );
+        $sanitized['files_field_id']          = sanitize_text_field( $input['files_field_id'] );
 
-        $sanitized['doc_id_key'] = sanitize_text_field( $input['doc_id_key'] );
-        $sanitized['doc_type_key'] = sanitize_text_field( $input['doc_type_key'] );
-        $sanitized['relative_file_path'] = sanitize_text_field( $input['relative_file_path'] );
+        $sanitized['doc_id_key']              = sanitize_text_field( $input['doc_id_key'] );
+        $sanitized['doc_type_key']            = sanitize_text_field( $input['doc_type_key'] );
+        $sanitized['relative_file_path']      = sanitize_text_field( $input['relative_file_path'] );
+
+        // Nouveau paramètre : delete_on_success
+        $sanitized['delete_on_success']       = isset( $input['delete_on_success'] ) && $input['delete_on_success'] ? true : false;
 
         // Logs de débogage
         error_log( "SharePoint Connect: Sanitized settings: " . wp_json_encode( $sanitized ) );
@@ -306,6 +319,16 @@ class SharePoint_Connect {
         echo '<p class="description">' . __( 'Chemin relatif vers le répertoire des fichiers attachés.', 'sharepoint-connect' ) . '</p>';
     }
 
+    // Nouvelle Callback : Supprimer l'entrée et les fichiers après succès
+    public function delete_on_success_callback() {
+        $checked = $this->settings['delete_on_success'] ? 'checked' : '';
+        printf(
+            '<input type="checkbox" id="delete_on_success" name="spc_settings[delete_on_success]" value="1" %s />',
+            $checked
+        );
+        echo '<p class="description">' . __( 'Cochez cette case pour supprimer l\'entrée et ses fichiers associés après un envoi réussi à SharePoint.', 'sharepoint-connect' ) . '</p>';
+    }
+
     public function enqueue_admin_styles( $hook ) {
         if ( $hook !== 'settings_page_sharepoint-connect' ) {
             return;
@@ -336,7 +359,6 @@ class SharePoint_Connect {
         $doc_id_key              = sanitize_text_field( $this->settings['doc_id_key'] );
         $doc_type_key            = sanitize_text_field( $this->settings['doc_type_key'] );
 
-
         // Récupère les données de l'entrée via $_POST['item_meta']
         $name          = $name_field_id && isset( $item_meta[ $name_field_id ] ) ? sanitize_text_field( $item_meta[ $name_field_id ] ) : '';
         $date_of_birth = $date_of_birth_field_id && isset( $item_meta[ $date_of_birth_field_id ] ) ? sanitize_text_field( $item_meta[ $date_of_birth_field_id ] ) : '';
@@ -364,7 +386,8 @@ class SharePoint_Connect {
                 if ( $file_path && file_exists( $file_path ) ) {
                     $files_and_docs[] = array(
                         'file' => $file_path,
-                        'type' => $doc_type
+                        'type' => $doc_type,
+                        'attachment_id' => $file_id, // Ajout de l'ID de l'attachement pour la suppression
                     );
                 } else {
                     error_log( "SharePoint Connect: Fichier introuvable ou non lisible pour l'ID $file_id." );
@@ -439,6 +462,26 @@ class SharePoint_Connect {
             // Succès - Optionnellement traiter la réponse
             // Par exemple, enregistrer une note dans l'entrée
             // update_post_meta( $entry_id, 'spc_response', $response );
+
+            // Vérifie si la suppression est activée
+            if ( $this->settings['delete_on_success'] ) {
+                // Supprimer les fichiers associés
+                foreach ( $files_and_docs as $file_doc ) {
+                    if ( isset( $file_doc['attachment_id'] ) ) {
+                        wp_delete_attachment( $file_doc['attachment_id'], true );
+                        error_log( "SharePoint Connect: Fichier attaché ID {$file_doc['attachment_id']} supprimé." );
+                    }
+                }
+
+                // Supprimer l'entrée
+                if ( class_exists( 'FrmEntry' ) ) {
+                    FrmEntry::destroy( $entry_id );
+                    error_log( "SharePoint Connect: Entrée ID $entry_id supprimée." );
+                } else {
+                    error_log( "SharePoint Connect: Classe FrmEntry introuvable. Impossible de supprimer l'entrée ID $entry_id." );
+                }
+            }
+
         } else {
             // Enregistrer l'erreur
             error_log( "SharePoint Connect: SharePoint responded with status code $http_code. Response: $response" );
